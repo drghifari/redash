@@ -92,12 +92,16 @@ def run_query(data_source, parameter_values, query_text, query_id, max_age=0):
     if query_result:
         return {'query_result': query_result.to_dict()}
     else:
-        job = enqueue_query(query_text, data_source, current_user.id, metadata={"Username": current_user.email, "Query ID": query_id})
+        if current_user.is_api_user():
+            job = enqueue_query(query_text, data_source, None, metadata={"Query ID": query_id})
+        else:
+            job = enqueue_query(query_text, data_source, current_user.id, metadata={"Username": current_user.email, "Query ID": query_id})
+
         return {'job': job.to_dict()}
 
 
 class QueryResultListResource(BaseResource):
-    @require_permission('execute_query')
+    @require_permission('view_query')
     def post(self):
         """
         Execute a query (or retrieve recent results).
@@ -115,6 +119,18 @@ class QueryResultListResource(BaseResource):
         query_id = params.get('query_id', 'adhoc')
 
         data_source = models.DataSource.get_by_id_and_org(params.get('data_source_id'), self.current_org)
+
+        if settings.ALLOW_PARAMETERS_IN_PUBLIC_DASHBOARD:
+            if isinstance(self.current_user, models.ApiUser):
+                max_age = 0
+                self.record_event({
+                    'action': 'execute_query',
+                    'timestamp': int(time.time()),
+                    'object_id': data_source.id,
+                    'object_type': 'data_source',
+                    'query': query
+                })
+                return run_query(data_source, parameter_values, query, query_id, max_age)
 
         if not has_access(data_source.groups, self.current_user, not_view_only):
             return {'job': {'status': 4, 'error': 'You do not have permission to run queries with this data source.'}}, 403
@@ -194,14 +210,12 @@ class QueryResultResource(BaseResource):
                     query_result = run_query_sync(query.data_source, parameter_values, query.to_dict()['query'], max_age=max_age)
                 elif query.latest_query_data_id is not None:
                     query_result = get_object_or_404(models.QueryResult.get_by_id_and_org, query.latest_query_data_id, self.current_org)
-                
+
             if query is not None and query_result is not None and self.current_user.is_api_user():
                 if query.query_hash != query_result.query_hash:
                     abort(404, message='No cached result found for this query.')
 
         if query_result:
-            require_access(query_result.data_source.groups, self.current_user, view_only)
-
             if isinstance(self.current_user, models.ApiUser):
                 event = {
                     'user_id': None,
@@ -222,6 +236,8 @@ class QueryResultResource(BaseResource):
                     event['object_id'] = query_result_id
 
                 record_event.delay(event)
+            else:
+                require_access(query_result.data_source.groups, self.current_user, view_only)
 
             if filetype == 'json':
                 response = self.make_json_response(query_result)

@@ -7,7 +7,7 @@
 version: '2'
 services:
   server:
-    image: redash/redash:latest
+    image: ghifari/redash:2
     command: server
     depends_on:
       - postgres
@@ -17,17 +17,25 @@ services:
     environment:
       PYTHONUNBUFFERED: 0
       REDASH_LOG_LEVEL: "INFO"
+      REDASH_ALLOW_PARAMETERS_IN_EMBEDS: "True"
+      REDASH_ALLOW_PARAMETERS_IN_PUBLIC_DASHBOARD: "True"
+      REDASH_FEATURE_ALLOW_CUSTOM_JS_VISUALIZATIONS: "True"
+      REDASH_FEATURE_SHOW_PERMISSIONS_CONTROL: "True"
       REDASH_REDIS_URL: "redis://redis:6379/0"
       REDASH_DATABASE_URL: "postgresql://postgres@postgres/postgres"
       REDASH_COOKIE_SECRET: veryverysecret
       REDASH_WEB_WORKERS: 4
     restart: always
   worker:
-    image: redash/redash:latest
+    image: ghifari/redash:2
     command: scheduler
     environment:
       PYTHONUNBUFFERED: 0
       REDASH_LOG_LEVEL: "INFO"
+      REDASH_ALLOW_PARAMETERS_IN_EMBEDS: "True"
+      REDASH_ALLOW_PARAMETERS_IN_PUBLIC_DASHBOARD: "True"
+      REDASH_FEATURE_ALLOW_CUSTOM_JS_VISUALIZATIONS: "True"
+      REDASH_FEATURE_SHOW_PERMISSIONS_CONTROL: "True"
       REDASH_REDIS_URL: "redis://redis:6379/0"
       REDASH_DATABASE_URL: "postgresql://postgres@postgres/postgres"
       QUEUES: "queries,scheduled_queries,celery"

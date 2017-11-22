@@ -50,9 +50,13 @@ def record_event(org, user, options):
             'org_id': org.id
         })
     else:
+        if isinstance(user.id, int):
+            user_id = user.id
+        else:
+            user_id = 1
+
         options.update({
-            'user_id': user.id,
-            'user_name': user.name,
+            'user_id': user_id,
             'org_id': org.id
         })
 
